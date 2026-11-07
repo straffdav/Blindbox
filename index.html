@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Blindbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --s: min(46vw, 220px);
+    --c1: #b84dff;
+    --c2: #00e5ff;
+    --c3: #ff3d9a;
+    --gold: #ffd36e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: #000;
+    color: #fff;
+    overflow: hidden;
+    font-family: "Orbitron", system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  #fx { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
+
+  /* soft colour glow on the floor of the scene */
+  .halo {
+    position: fixed; left: 50%; top: 50%;
+    width: calc(var(--s) * 3); height: calc(var(--s) * 3);
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(184,77,255,.28) 0%, rgba(0,229,255,.12) 35%, transparent 65%);
+    filter: blur(10px);
+    animation: halo 4s ease-in-out infinite;
+    z-index: 1; pointer-events: none;
+    transition: opacity .6s;
+  }
+  @keyframes halo {
+    0%,100% { opacity: .7; transform: translate(-50%, -50%) scale(1); }
+    50%     { opacity: 1;  transform: translate(-50%, -50%) scale(1.12); }
+  }
+
+  .stage {
+    position: fixed; inset: 0;
+    display: grid; place-items: center;
+    z-index: 2;
+    perspective: 1000px;
+    cursor: pointer;
+  }
+
+  .float { animation: float 3.2s ease-in-out infinite; transform-style: preserve-3d; }
+  @keyframes float {
+    0%,100% { transform: translateY(-10px); }
+    50%     { transform: translateY(14px); }
+  }
+
+  .wrap { transform-style: preserve-3d; }
+  .shake .wrap { animation: shake .9s cubic-bezier(.36,.07,.19,.97) both; }
+  @keyframes shake {
+    0%   { transform: scale(1) rotateZ(0); }
+    10%  { transform: scale(.92) rotateZ(-6deg); }
+    20%  { transform: scale(.94) rotateZ(7deg); }
+    30%  { transform: scale(.93) rotateZ(-9deg); }
+    40%  { transform: scale(.95) rotateZ(10deg); }
+    50%  { transform: scale(.94) rotateZ(-12deg); }
+    60%  { transform: scale(.96) rotateZ(12deg); }
+    70%  { transform: scale(.95) rotateZ(-8deg); }
+    80%  { transform: scale(1.08) rotateZ(4deg); }
+    100% { transform: scale(1.12) rotateZ(0); }
+  }
+
+  .box {
+    position: relative;
+    width: var(--s); height: var(--s);
+    transform-style: preserve-3d;
+    animation: spin 9s linear infinite;
+  }
+  @keyframes spin {
+    from { transform: rotateX(-22deg) rotateY(0deg); }
+    to   { transform: rotateX(-22deg) rotateY(360deg); }
+  }
+  .opening .box, .revealed .box { animation-play-state: paused; }
+
+  .face {
+    position: absolute; inset: 0;
+    background:
+      linear-gradient(90deg, transparent 42%, rgba(255,211,110,.95) 42%, #ffb938 50%, rgba(255,211,110,.95) 58%, transparent 58%),
+      radial-gradient(circle at 30% 25%, rgba(255,255,255,.18), transparent 55%),
+      linear-gradient(135deg, #3a0a6b 0%, #1a0533 55%, #0b0220 100%);
+    border: 2px solid rgba(0,229,255,.85);
+    box-shadow:
+      inset 0 0 30px rgba(184,77,255,.65),
+      inset 0 0 4px rgba(0,229,255,.9),
+      0 0 22px rgba(0,229,255,.45);
+    display: grid; place-items: center;
+    backface-visibility: visible;
+  }
+  .face .q {
+    font-size: calc(var(--s) * .42);
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 8px var(--c3), 0 0 22px var(--c3), 0 0 44px var(--c1);
+    animation: qpulse 1.6s ease-in-out infinite;
+    position: relative; z-index: 1;
+  }
+  @keyframes qpulse {
+    0%,100% { opacity: .85; transform: scale(1); }
+    50%     { opacity: 1;   transform: scale(1.08); }
+  }
+  .front  { transform: translateZ(calc(var(--s) / 2)); }
+  .back   { transform: rotateY(180deg) translateZ(calc(var(--s) / 2)); }
+  .right  { transform: rotateY(90deg)  translateZ(calc(var(--s) / 2)); }
+  .left   { transform: rotateY(-90deg) translateZ(calc(var(--s) / 2)); }
+  .bottom { transform: rotateX(-90deg) translateZ(calc(var(--s) / 2)); box-shadow: 0 0 60px rgba(184,77,255,.8); }
+  .inner  { /* glowing floor inside the box, visible once the lid is off */
+    transform: rotateX(90deg) translateZ(calc(var(--s) / -2 + 2px));
+    background: radial-gradient(circle, #fff 0%, var(--gold) 25%, rgba(255,61,154,.6) 55%, transparent 75%);
+    border: none; box-shadow: none; opacity: 0; transition: opacity .4s;
+  }
+  .opening .inner, .revealed .inner { opacity: 1; }
+
+  .lid {
+    position: absolute; inset: 0;
+    transform-style: preserve-3d;
+    transform: translateY(0) rotateX(0) rotateZ(0);
+    transition: transform 1s cubic-bezier(.2,.9,.25,1), opacity 1s ease;
+  }
+  .lid .top {
+    transform: rotateX(90deg) translateZ(calc(var(--s) / 2 + 2px)) scale(1.1);
+    background:
+      linear-gradient(90deg, transparent 42%, #ffd36e 42%, #ffb938 50%, #ffd36e 58%, transparent 58%),
+      linear-gradient(0deg,  transparent 42%, #ffd36e 42%, #ffb938 50%, #ffd36e 58%, transparent 58%),
+      linear-gradient(135deg, #4b0f87, #1a0533);
+  }
+  .bow {
+    position: absolute; left: 50%; top: 0;
+    width: calc(var(--s) * .5); height: calc(var(--s) * .26);
+    transform: translate(-50%, calc(var(--s) * -.23)) rotateY(0deg);
+    transform-style: preserve-3d;
+  }
+  .bow i {
+    position: absolute; top: 0;
+    width: 50%; height: 100%;
+    border: calc(var(--s) * .045) solid #ffc54a;
+    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+    box-shadow: 0 0 14px rgba(255,197,74,.9), inset 0 0 8px rgba(255,255,255,.5);
+  }
+  .bow i:first-child { left: 0;  transform: rotate(-18deg); }
+  .bow i:last-child  { right: 0; transform: rotate(18deg); }
+  .bow2 { transform: translate(-50%, calc(var(--s) * -.23)) rotateY(90deg); }
+
+  .opening .lid, .revealed .lid {
+    transform: translateY(calc(var(--s) * -2.6)) rotateX(-55deg) rotateZ(35deg);
+    opacity: 0;
+  }
+
+  /* beam of light out of the open box */
+  .beam {
+    position: fixed; left: 50%; top: 50%;
+    width: calc(var(--s) * 1.1); height: 140vh;
+    transform: translate(-50%, -100%) scaleX(0);
+    transform-origin: 50% 100%;
+    background: linear-gradient(0deg, rgba(255,240,200,.95) 0%, rgba(255,61,154,.45) 35%, rgba(184,77,255,.15) 70%, transparent 100%);
+    clip-path: polygon(30% 100%, 70% 100%, 100% 0, 0 0);
+    filter: blur(6px);
+    opacity: 0;
+    z-index: 1; pointer-events: none;
+  }
+  .opening .beam, .revealed .beam { animation: beam 1.4s ease-out forwards; }
+  @keyframes beam {
+    0%   { opacity: 0; transform: translate(-50%, -100%) scaleX(0); }
+    25%  { opacity: 1; transform: translate(-50%, -100%) scaleX(1.2); }
+    100% { opacity: .35; transform: translate(-50%, -100%) scaleX(1); }
+  }
+
+  .flash {
+    position: fixed; inset: 0; background: #fff; opacity: 0;
+    pointer-events: none; z-index: 5;
+  }
+  .flash.go { animation: flash .7s ease-out; }
+  @keyframes flash { 0% { opacity: .85; } 100% { opacity: 0; } }
+
+  /* the revealed number */
+  .reveal {
+    position: fixed; inset: 0;
+    display: grid; place-items: center;
+    z-index: 4; pointer-events: none;
+  }
+  .rays {
+    position: absolute; left: 50%; top: 50%;
+    width: 150vmax; height: 150vmax;
+    transform: translate(-50%, -50%) scale(0);
+    background: repeating-conic-gradient(from 0deg, rgba(255,211,110,.16) 0deg 8deg, transparent 8deg 20deg);
+    -webkit-mask: radial-gradient(circle, #000 0%, transparent 45%);
+            mask: radial-gradient(circle, #000 0%, transparent 45%);
+    opacity: 0;
+  }
+  .revealed .rays { animation: rays-in .8s ease-out forwards, rays-spin 18s linear infinite; }
+  @keyframes rays-in { to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+  @keyframes rays-spin { to { rotate: 360deg; } }
+
+  .num {
+    position: relative;
+    font-size: min(46vw, 300px);
+    font-weight: 900;
+    line-height: 1;
+    background: linear-gradient(180deg, #fff 0%, var(--gold) 35%, var(--c3) 70%, var(--c1) 100%);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 0 18px rgba(255,61,154,.8)) drop-shadow(0 0 50px rgba(184,77,255,.7));
+    transform: scale(0) rotate(-25deg);
+    opacity: 0;
+  }
+  .revealed .num { animation: pop .9s cubic-bezier(.18,1.6,.4,1) forwards, glow 2s ease-in-out .9s infinite; }
+  @keyframes pop {
+    0%   { transform: translateY(20vh) scale(0) rotate(-25deg); opacity: 0; }
+    60%  { opacity: 1; }
+    100% { transform: translateY(0) scale(1) rotate(0); opacity: 1; }
+  }
+  @keyframes glow {
+    0%,100% { transform: scale(1); filter: drop-shadow(0 0 18px rgba(255,61,154,.8)) drop-shadow(0 0 50px rgba(184,77,255,.7)); }
+    50%     { transform: scale(1.05); filter: drop-shadow(0 0 28px rgba(255,211,110,.95)) drop-shadow(0 0 80px rgba(0,229,255,.6)); }
+  }
+
+  /* hide the box once the number is out */
+  .revealed .float { animation: sink .6s ease-in forwards; }
+  @keyframes sink { to { transform: translateY(30vh) scale(.3); opacity: 0; } }
+  .revealed .halo { opacity: .4; }
+
+  .hint {
+    position: fixed; left: 0; right: 0;
+    bottom: max(7vh, env(safe-area-inset-bottom, 0px) + 24px);
+    text-align: center;
+    font-size: 13px; letter-spacing: .5em; text-indent: .5em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,.75);
+    text-shadow: 0 0 10px var(--c2);
+    animation: blink 2s ease-in-out infinite;
+    z-index: 6; pointer-events: none;
+    transition: opacity .4s;
+  }
+  @keyframes blink { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+  .opening .hint { opacity: 0; animation: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .box, .float, .halo, .face .q { animation: none !important; }
+    .box { transform: rotateX(-22deg) rotateY(-30deg); }
+  }
+</style>
+</head>
+<body>
+<canvas id="fx"></canvas>
+<div id="root">
+  <div class="halo"></div>
+  <div class="beam"></div>
+
+  <div class="stage" id="stage" role="button" tabindex="0" aria-label="Open the blindbox">
+    <div class="float">
+      <div class="wrap">
+        <div class="box">
+          <div class="face front"><span class="q">?</span></div>
+          <div class="face back"><span class="q">?</span></div>
+          <div class="face right"><span class="q">?</span></div>
+          <div class="face left"><span class="q">?</span></div>
+          <div class="face bottom"></div>
+          <div class="face inner"></div>
+          <div class="lid">
+            <div class="face top"></div>
+            <div class="bow"><i></i><i></i></div>
+            <div class="bow bow2"><i></i><i></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="reveal" aria-live="polite">
+    <div class="rays"></div>
+    <div class="num" id="num"></div>
+  </div>
+
+  <div class="hint" id="hint">Tap to open</div>
+</div>
+<div class="flash" id="flash"></div>
+
+<script>
+(() => {
+  const root  = document.getElementById('root');
+  const stage = document.getElementById('stage');
+  const num   = document.getElementById('num');
+  const hint  = document.getElementById('hint');
+  const flash = document.getElementById('flash');
+  const canvas = document.getElementById('fx');
+  const ctx = canvas.getContext('2d');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let W, H, dpr;
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  resize();
+  addEventListener('resize', resize);
+
+  // ---- background stars ----
+  const stars = Array.from({ length: 140 }, () => ({
+    x: Math.random(), y: Math.random(),
+    r: Math.random() * 1.4 + .3,
+    s: Math.random() * .00025 + .00005,
+    t: Math.random() * Math.PI * 2,
+    hue: [280, 190, 330, 50][Math.floor(Math.random() * 4)]
+  }));
+
+  // ---- burst particles ----
+  let parts = [];
+  const COLORS = ['#ffd36e', '#ff3d9a', '#b84dff', '#00e5ff', '#ffffff'];
+  function burst(x, y) {
+    const n = reduced ? 40 : 180;
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const v = Math.random() * 11 + 3;
+      parts.push({
+        x, y,
+        vx: Math.cos(a) * v,
+        vy: Math.sin(a) * v - 4,
+        life: 1,
+        decay: Math.random() * .012 + .008,
+        size: Math.random() * 6 + 3,
+        rot: Math.random() * Math.PI,
+        vr: (Math.random() - .5) * .3,
+        c: COLORS[Math.floor(Math.random() * COLORS.length)],
+        shape: Math.random() < .5 ? 'rect' : 'spark'
+      });
+    }
+  }
+
+  function frame(t) {
+    ctx.clearRect(0, 0, W, H);
+
+    for (const s of stars) {
+      s.y -= s.s * 16;
+      if (s.y < 0) { s.y = 1; s.x = Math.random(); }
+      const a = .35 + .65 * (0.5 + 0.5 * Math.sin(t * .002 + s.t));
+      ctx.beginPath();
+      ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${s.hue}, 100%, 80%, ${a})`;
+      ctx.fill();
+    }
+
+    ctx.globalCompositeOperation = 'lighter';
+    parts = parts.filter(p => p.life > 0);
+    for (const p of parts) {
+      p.vx *= .985; p.vy = p.vy * .985 + .18;
+      p.x += p.vx; p.y += p.vy;
+      p.rot += p.vr;
+      p.life -= p.decay;
+      ctx.save();
+      ctx.globalAlpha = Math.max(p.life, 0);
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.c;
+      ctx.shadowColor = p.c; ctx.shadowBlur = 12;
+      if (p.shape === 'rect') ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+      else { ctx.beginPath(); ctx.arc(0, 0, p.size / 3, 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // ---- random 1..15 ----
+  function roll() {
+    const buf = new Uint32Array(1);
+    const limit = Math.floor(0x100000000 / 15) * 15; // avoid modulo bias
+    do { crypto.getRandomValues(buf); } while (buf[0] >= limit);
+    return (buf[0] % 15) + 1;
+  }
+
+  // ---- state machine: idle -> opening -> revealed -> idle ----
+  let state = 'idle';
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+
+  async function open() {
+    state = 'opening';
+    root.classList.add('shake');
+    navigator.vibrate?.([30, 40, 30, 40, 60]);
+    await wait(900);
+
+    root.classList.remove('shake');
+    root.classList.add('opening');
+    num.textContent = roll();
+    await wait(450);
+
+    flash.classList.remove('go'); void flash.offsetWidth; flash.classList.add('go');
+    burst(W / 2, H / 2);
+    root.classList.add('revealed');
+    navigator.vibrate?.(80);
+    await wait(900);
+
+    hint.textContent = 'Tap to play again';
+    state = 'revealed';
+  }
+
+  function reset() {
+    state = 'idle';
+    root.classList.remove('opening', 'revealed', 'shake');
+    hint.textContent = 'Tap to open';
+  }
+
+  function onTap() {
+    if (state === 'idle') open();
+    else if (state === 'revealed') reset();
+  }
+  stage.addEventListener('click', onTap);
+  stage.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTap(); }
+  });
+})();
+</script>
+</body>
+</html>
